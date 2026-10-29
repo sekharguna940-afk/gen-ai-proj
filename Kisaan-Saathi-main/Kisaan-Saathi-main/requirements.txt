@@ -1,0 +1,28 @@
+# For the web server
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+
+# For Machine Learning & AI
+tensorflow==2.19.0
+numpy<1.27
+pillow
+scikit-learn
+joblib
+
+# For the AI Chatbots
+google-generativeai
+langchain-core
+requests
+pandas
+langgraph
+IPython
+langchain_groq
+chromadb
+langchain
+langchain-community
+jinja2
+sentence-transformers
+tf-keras==2.19.0
+python-multipart

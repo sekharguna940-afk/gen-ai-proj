@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmer Assistant - Kisaan Saathi 🌾</title>
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23395a7f'/%3E%3Cpath d='M30 40c0 0 5-10 20-10s20 10 20 10M30 60c0 0 5 10 20 10s20-10 20-10M50 40v20' stroke='white' stroke-width='8' fill='none'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-[#1e3a23] min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-[#162619] p-6 border-b border-[#2d3d2f]/40">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="text-[#4caf50] text-3xl font-bold">Kisaan Saathi 🌾</div>
+                <span class="px-3 py-1 bg-[#4caf50]/20 rounded-full text-[#4caf50] text-sm">AI Assistant</span>
+            </div>
+            <a href="/dashboard.html" class="bg-[#1a2e1d] hover:bg-[#223423] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all">
+                <i class="fas fa-chart-line"></i>
+                <span>Dashboard</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 py-8">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex gap-6">
+                <!-- Main Chat Section -->
+                <div class="flex-1">
+                    <div class="bg-[#162619] rounded-2xl border border-[#2d3d2f]/40 shadow-xl overflow-hidden">
+                        <!-- Chat Header -->
+                        <div class="p-6 border-b border-[#2d3d2f]/40 flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full bg-[#4caf50]/20 flex items-center justify-center">
+                                <i class="fas fa-robot text-[#4caf50] text-2xl"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-white text-xl font-bold">Farming Assistant</h2>
+                                <p class="text-gray-400">Ask me anything about farming</p>
+                            </div>
+                        </div>
+
+                        <!-- Chat Messages -->
+                        <div class="h-[600px] overflow-y-auto p-6 space-y-6" id="chat-messages">
+                            <!-- Welcome Message -->
+                            <div class="flex items-start gap-4">
+                                <div class="w-10 h-10 rounded-full bg-[#4caf50]/20 flex items-center justify-center text-[#4caf50]">
+                                    <i class="fas fa-robot"></i>
+                                </div>
+                                <div class="bg-[#1a2e1d] rounded-2xl rounded-tl-none p-4 max-w-[80%] shadow-lg">
+                                    <p class="text-white">Namaste! I'm your farming assistant. How can I help you today?</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chat Input -->
+                        <div class="p-6 border-t border-[#2d3d2f]/40 bg-[#162619]">
+                            <div class="flex items-center gap-4">
+                                <div class="flex-1 bg-[#1a2e1d] rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-[#4caf50]/50">
+                                    <input type="text" id="message-input" 
+                                        placeholder="Type your question here..." 
+                                        class="w-full bg-transparent text-white placeholder-gray-400 focus:outline-none">
+                                </div>
+                                <button id="send-button" 
+                                    class="bg-[#4caf50] hover:bg-[#3d9140] text-white rounded-xl px-6 py-3 flex items-center gap-2 transition-all">
+                                    <span>Send</span>
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Help Sidebar -->
+                <div class="w-80">
+                    <div class="bg-[#162619] rounded-2xl p-6 sticky top-8">
+                        <div class="flex items-center gap-3 mb-6">
+                            <i class="fas fa-lightbulb text-[#4caf50] text-2xl"></i>
+                            <h3 class="text-white font-bold text-lg">Quick Questions</h3>
+                        </div>
+                        <div class="space-y-3">
+                            <button class="quick-question w-full text-left p-4 bg-[#1a2e1d] rounded-xl text-gray-300 hover:bg-[#223423] hover:text-[#4caf50] transition-all">
+                                How to protect crops from diseases?
+                            </button>
+                            <button class="quick-question w-full text-left p-4 bg-[#1a2e1d] rounded-xl text-gray-300 hover:bg-[#223423] hover:text-[#4caf50] transition-all">
+                                Best time to sow wheat?
+                            </button>
+                            <button class="quick-question w-full text-left p-4 bg-[#1a2e1d] rounded-xl text-gray-300 hover:bg-[#223423] hover:text-[#4caf50] transition-all">
+                                How to improve soil health?
+                            </button>
+                            <button class="quick-question w-full text-left p-4 bg-[#1a2e1d] rounded-xl text-gray-300 hover:bg-[#223423] hover:text-[#4caf50] transition-all">
+                                Government schemes for farmers?
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+
+    <script src="static/farmer-assistant.js"></script>
+</body>
+</html>

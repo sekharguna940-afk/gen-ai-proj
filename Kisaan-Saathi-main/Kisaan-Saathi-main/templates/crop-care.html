@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crop Care - Kisaan Saathi 🌾</title>
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23395a7f'/%3E%3Cpath d='M30 40c0 0 5-10 20-10s20 10 20 10M30 60c0 0 5 10 20 10s20-10 20-10M50 40v20' stroke='white' stroke-width='8' fill='none'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body class="bg-[#1e3a23]">
+
+    <div class="container mx-auto py-8 px-4">
+        <!-- Dashboard Button -->
+        <div class="mb-6">
+            <a href="/dashboard.html" class="inline-flex items-center gap-2 px-4 py-2 bg-[#4caf50] hover:bg-[#2e7d32] text-white rounded-lg transition-colors">
+                <i class="fas fa-arrow-left"></i>
+                Back to Dashboard
+            </a>
+        </div>
+
+        <!-- Report Section -->
+        <div class="w-full bg-[#1e3a23] py-16" id="report">
+            <div class="max-w-6xl mx-auto px-4">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-8 text-center">🌾 Crop Disease Detection</h2>
+
+                <!-- Main Report Container -->
+                <div
+                    class="bg-[#2a5a31]/50 backdrop-blur-md rounded-xl shadow-lg border border-[#4caf50]/20 overflow-hidden">
+                    <!-- Input Section -->
+                    <div class="p-6 space-y-6">
+                        <!-- Location Input -->
+                        <div class="flex gap-3">
+                            <div class="flex-1">
+                                <label class="block text-gray-300 text-sm font-medium mb-2">Location</label>
+                                <div class="relative">
+                                    <input id="location-input" type="text"
+                                        placeholder="Enter location or use current location"
+                                        class="w-full p-4 bg-[#1e3a23] rounded-xl border border-[#4caf50]/30 focus:outline-none focus:ring-2 focus:ring-purple-400 text-gray-300"
+                                        readonly />
+                                    <button type="button" onclick="toggleLocationInput()"
+                                        class="absolute right-3 top-1/2 -translate-y-1/2 text-[#4caf50] hover:text-purple-300"
+                                        title="Toggle manual input">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
+                                <!-- Add a hidden input for coordinates -->
+                                <input type="hidden" id="coordinates-input">
+                                <!-- Location status message -->
+                                <p id="location-status" class="text-sm text-[#4caf50] mt-2"></p>
+                                <!-- Manual input instructions -->
+                                <div id="manual-input-instructions"
+                                    class="hidden mt-2 text-sm text-gray-300 bg-[#1e3a23] p-3 rounded-lg">
+                                    <p class="font-medium mb-2">Tips for better location accuracy:</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li>Enable GPS on your device</li>
+                                        <li>Move to an open area with clear sky view</li>
+                                        <li>Wait a few seconds for GPS to stabilize</li>
+                                        <li>Try refreshing the page and detecting again</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <button type="button" onclick="getLocation()" id="detect-location"
+                                class="px-4 bg-[#4caf50] hover:bg-[#2e7d32] text-white rounded-xl transition-all flex items-center justify-center group"
+                                title="Use current location">
+                                <i id="location-icon" class="fas fa-location-dot text-xl group-hover:animate-pulse"></i>
+                                <i id="location-loader" class="fas fa-circle-notch animate-spin text-xl hidden"></i>
+                            </button>
+                        </div>
+
+                        <!-- Upload Image Section -->
+                        <div>
+                            <label class="block text-gray-300 text-sm font-medium mb-2">Photos</label>
+                            <div class="flex items-center gap-4">
+                                <button id="upload-btn"
+                                    class="flex-1 py-4 px-6 bg-gradient-to-r from-[#4caf50] to-[#2e7d32] hover:from-[#2e7d32] hover:to-[#1b5e20] text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3 shadow-lg">
+                                    <i class="fas fa-camera text-xl"></i>
+                                    <span>Upload Photo</span>
+                                </button>
+                                <input type="file" id="image-upload" accept="image/*" class="hidden" />
+                            </div>
+
+                            <!-- Single Image Preview -->
+                            <div id="image-container" class="hidden mt-4">
+                                <div
+                                    class="relative w-48 h-48 border-2 border-dashed border-[#4caf50]/30 rounded-lg overflow-hidden">
+                                    <img id="image-preview" class="w-full h-full object-cover" />
+                                    <button id="remove-image"
+                                        class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600">
+                                        <i class="fas fa-times text-xs w-4 h-4 flex items-center justify-center"></i>
+                                    </button>
+                                </div>
+                                <p class="text-sm text-gray-400 mt-2">Max 1 photo (2MB max)</p>
+                            </div>
+                        </div>
+                        <!-- Select language -->
+                        <div>
+                            <label for="language-select" class="block text-gray-300 text-sm font-medium mb-2">Select Language</label>
+                            <select id="language-select"
+                                class="w-full p-4 bg-[#1e3a23] rounded-xl border border-[#4caf50]/30 focus:outline-none focus:ring-2 focus:ring-purple-400 text-gray-300">
+                                <option value="English">English</option>
+                                <option value="हिन्दी">हिन्दी</option>
+                                <option value="ਪੰਜਾਬੀ">ਪੰਜਾਬੀ</option>
+                                <option value="ಕನ್ನಡ">ಕನ್ನಡ</option>
+                            </select>
+                        </div>
+
+                        <!-- Submit Button Example -->
+                        <button id="submit-query"
+                            class="w-full py-4 bg-gradient-to-r from-[#4caf50] to-[#2e7d32] hover:from-[#2e7d32] hover:to-[#1b5e20] text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3 shadow-lg">
+                            <i class="fas fa-paper-plane"></i>
+                            <span>Submit Report</span>
+                        </button>
+
+                    <!-- Response Section -->
+                    <div id="response-container" class="hidden border-t border-[#4caf50]/20">
+                        <div class="p-6 space-y-4">
+                            <h3 class="text-xl font-semibold text-white flex items-center gap-2">
+                                <i class="fas fa-comment-dots text-[#4caf50]"></i>
+                                Response
+                            </h3>
+                            <div class="bg-[#1e3a23] p-4 rounded-xl text-white">
+                                <!-- AI responses will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hotspot Map Section -->
+        <div class="mt-8">
+            <h2 class="text-3xl md:text-4xl font-bold text-white mb-8 text-center">🌾 Disease Hotspot Analysis</h2>
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- Map Container -->
+                <div class="bg-[#2a5a31]/50 rounded-xl shadow-lg overflow-hidden border border-[#4caf50]/20">
+                    <div class="p-4 bg-[#1e3a23] text-white flex justify-between items-center">
+                        <h3 class="font-semibold flex items-center gap-2">
+                            <i class="fas fa-map-marker-alt text-[#4caf50]"></i>
+                            Disease Hotspot Map
+                        </h3>
+                        <div class="flex items-center gap-4">
+                            <span class="text-sm flex items-center gap-2">
+                                <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                Live Updates
+                            </span>
+                            <button class="p-2 hover:bg-[#4caf50] rounded-lg transition-colors">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="relative h-[500px]">
+                        <iframe src="/static/hotspot_map.html" class="absolute inset-0 w-full h-full border-none" allowfullscreen>
+                        </iframe>
+                    </div>
+                </div>
+
+                <!-- Map Description Panel -->
+                <div class="bg-[#2a5a31]/50 rounded-xl p-6 border border-[#4caf50]/20">
+                    <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-info-circle text-[#4caf50]"></i>
+                        About Hotspot Map
+                    </h3>
+                    <div class="space-y-4">
+                        <p class="text-gray-300">
+                            This interactive map helps identify areas with concentrated reports of crop diseases across Rajasthan. The system automatically clusters nearby reports to create hotspots, enabling government agencies to:
+                        </p>
+                        <ul class="space-y-3 text-gray-300">
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-[#4caf50] mt-1"></i>
+                                <span>Identify areas requiring immediate inspection and intervention</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-[#4caf50] mt-1"></i>
+                                <span>Allocate resources efficiently to affected regions</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-[#4caf50] mt-1"></i>
+                                <span>Monitor disease spread patterns in real-time</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-[#4caf50] mt-1"></i>
+                                <span>Coordinate with local agricultural departments</span>
+                            </li>
+                        </ul>
+                        <div class="mt-4 p-4 bg-[#1e3a23] rounded-lg">
+                            <h4 class="text-[#4caf50] font-medium mb-2">Priority Levels</h4>
+                            <div class="space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                    <span class="text-gray-300 text-sm">High Priority - Immediate action required</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                                    <span class="text-gray-300 text-sm">Medium Priority - Monitor closely</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                    <span class="text-gray-300 text-sm">Low Priority - Standard monitoring</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/disease_detection_response.js"></script>
+</body>
+
+</html> 
