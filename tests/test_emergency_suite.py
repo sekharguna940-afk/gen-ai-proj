@@ -19,7 +19,7 @@ from pathlib import Path
 
 # ─── Path setup ───────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-BACKEND_DIR = PROJECT_ROOT / "sahaya ai" / "backend"
+BACKEND_DIR = PROJECT_ROOT / "backend"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
@@ -109,7 +109,7 @@ class SahayaEmergencyTestSuite(unittest.TestCase):
                 r = await c.post("/api/emergency", json={
                     "category_id": "medical",
                     "description": "Victim unconscious following collapse, heavy breathing.",
-                    "reporter_name": "Sanjay Rao",
+                    "reporter_name": "Citizen User",
                     "reporter_phone": "+919822114477",
                     "latitude": 18.5204,
                     "longitude": 73.8567,
@@ -219,7 +219,7 @@ class SahayaEmergencyTestSuite(unittest.TestCase):
                 good = await c.post(f"/api/emergency/{case_id}/triage", json={
                     "severity": "CRITICAL",
                     "reason": "Exposed high-voltage conduit detected underneath loose stone.",
-                    "dispatcher_name": "Dispatcher Deshmukh"
+                    "dispatcher_name": "Operations Dispatcher"
                 })
                 self.assertEqual(good.status_code, 200, good.text)
                 gd = good.json()
@@ -306,7 +306,7 @@ class SahayaEmergencyTestSuite(unittest.TestCase):
                 cr = await c.post("/api/emergency", json={
                     "category_id": "road_accident",
                     "description": "Bike skid on highway, minor knee abrasion, victim conscious.",
-                    "reporter_name": "Pooja Patil",
+                    "reporter_name": "Citizen Reporter",
                     "reporter_phone": "+919822004455",
                     "latitude": 18.5204,
                     "longitude": 73.8567
@@ -326,7 +326,7 @@ class SahayaEmergencyTestSuite(unittest.TestCase):
                 # 3. Accept
                 acc = await c.post(f"/api/emergency/{case_id}/accept", json={
                     "responder_id": "RSP-001",
-                    "responder_name": "Dr. Ananya Sharma"
+                    "responder_name": "Lead Trauma Paramedic Unit"
                 })
                 self.assertEqual(acc.status_code, 200, acc.text)
                 self.assertEqual(acc.json()["status"], "ACCEPTED")
@@ -406,7 +406,7 @@ class SahayaEmergencyTestSuite(unittest.TestCase):
                 # Reject with reason → UNASSIGNED
                 rej = await c.post(f"/api/emergency/{case_id}/reject", json={
                     "responder_id": "RSP-003",
-                    "responder_name": "Rajesh Deshmukh",
+                    "responder_name": "High-Voltage Emergency Lineman",
                     "reason": "Vehicle electrical failure on highway, cannot reach site."
                 })
                 self.assertEqual(rej.status_code, 200, rej.text)

@@ -32,10 +32,10 @@ const Login = ({ onLogin }) => {
     const handleQuickLogin = (role) => {
         const targetRole = role || selectedRole;
         const defaultNames = {
-            citizen: 'Sanjay Rao',
-            farmer: 'Ramesh Patil',
-            admin: 'Command Dispatcher Deshmukh',
-            worker: 'Dr. Ananya Sharma (RSP-001)'
+            citizen: 'Citizen User',
+            farmer: 'Registered Farmer',
+            admin: 'Emergency Operations Dispatcher',
+            worker: 'Emergency Response Lead (RSP-001)'
         };
         const defaultPhones = {
             citizen: '+919822114477',

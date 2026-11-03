@@ -43,15 +43,9 @@ import sys
 from pathlib import Path
 
 _this_file = Path(__file__).resolve()
-for candidate in [
-    _this_file.parent.parent / "sahaya ai" / "backend",
-    _this_file.parent.parent.parent / "sahaya ai" / "backend",
-    _this_file.parent / "sahaya ai" / "backend"
-]:
-    if candidate.exists():
-        if str(candidate) not in sys.path:
-            sys.path.insert(0, str(candidate))
-        break
+backend_dir = _this_file.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 try:
     from emergency.seed import init_db_and_seed
@@ -78,14 +72,8 @@ templates = Jinja2Templates(directory=templates_dir) if os.path.exists(templates
 water_footprint_model = None
 water_model_paths = [
     os.path.join(BASE_APP_DIR, 'Water Footprint Model', 'Model', 'water_footprint_model.pkl'),
-    os.path.join(BASE_APP_DIR, '..', '..', 'sahaya ai', 'model', 'crop_health', 'water_footprint_model.pkl'),
+    os.path.join(BASE_APP_DIR, 'model', 'crop_health', 'water_footprint_model.pkl'),
     'Water Footprint Model/Model/water_footprint_model.pkl',
-    '../../sahaya ai/model/crop_health/water_footprint_model.pkl',
-    'sahaya ai/model/crop_health/water_footprint_model.pkl',
-    'water_footprint_model.pkl'
-]
-    '../../sahaya ai/model/crop_health/water_footprint_model.pkl',
-    'sahaya ai/model/crop_health/water_footprint_model.pkl',
     'water_footprint_model.pkl'
 ]
 for p in water_model_paths:

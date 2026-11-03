@@ -49,41 +49,43 @@
 
 ```text
 gen-ai-proj/
-├── Kisaan-Saathi-main/         # Farmer Portal, ML Models & Static Templates
-│   ├── Disease prediction Model/ # Plant disease classifier classes & weights
-│   ├── Water Footprint Model/   # ML water requirement models & datasets
-│   ├── static/                  # HTML/JS assets for standalone farmer tools
-│   ├── templates/               # Jinja2 templates (dashboard, crop-care, etc.)
-│   ├── app.py                   # Unified FastAPI backend entry point
-│   ├── prediction.py            # Crop disease inference pipeline
-│   ├── schemes_data.py          # Real-time government schemes dataset
-│   └── FarmerAssistant.py       # Conversational farming advisory assistant
+├── backend/                    # Unified Production Backend (FastAPI + ML + SQLite)
+│   ├── emergency/              # Emergency response engine (triage, matching, models, router)
+│   ├── Disease prediction Model/ # Crop disease classification weights & indices
+│   ├── Water Footprint Model/  # Water requirement estimator models & datasets
+│   ├── ml/ & model/            # Civic classification & fast inference models
+│   ├── static/                 # Static assets for agricultural portal
+│   ├── templates/              # Jinja2 templates for agricultural portal
+│   ├── app.py                  # Single Unified FastAPI entry point (94 routes)
+│   ├── civic_router.py         # Civic complaints and authentication endpoints
+│   ├── server.py               # Uvicorn entry point runner
+│   ├── FarmerAssistant.py      # Conversational farming advisory assistant
+│   ├── prediction.py           # Crop disease inference pipeline
+│   ├── schemes_data.py         # Real-time government welfare schemes dataset
+│   ├── emergency_sahaya.db     # Persistent SQLite database (auto-seeded)
+│   └── requirements.txt        # Backend Python dependencies
 │
-├── sahaya ai/                  # Modern React 19 Frontend & Emergency Backend
-│   ├── backend/
-│   │   ├── emergency/           # Emergency models, triage, matching & router
-│   │   ├── civic_router.py      # Civic complaints and authentication endpoints
-│   │   ├── server.py            # Unified backend runner script
-│   │   └── emergency_sahaya.db  # Persistent SQLite database (seeded)
+├── frontend/                   # Modern React 19 + Vite 7 Frontend
 │   ├── src/
-│   │   ├── components/          # SOS modal, helpline directory, layouts
-│   │   ├── pages/               # Citizen, Farmer, Dispatcher & Responder pages
-│   │   └── services/            # REST API client & WebSocket client
-│   ├── package.json             # Frontend dependencies & scripts
-│   └── vite.config.js           # Vite development and build configuration
+│   │   ├── components/         # Emergency SOS modal, helplines, layouts, topbar
+│   │   ├── pages/              # Citizen, Farmer, Dispatcher, Responder portals
+│   │   └── services/           # REST API client & WebSocket client
+│   ├── index.html              # HTML entry point
+│   ├── package.json            # Frontend NPM dependencies & scripts
+│   └── vite.config.js          # Vite configuration
 │
 ├── tests/
-│   └── test_emergency_suite.py  # 15 automated integration tests
+│   └── test_emergency_suite.py # 15 automated integration tests (all passing)
 │
-├── .gitignore                   # Production git exclusion rules
-├── package.json                 # Root script delegator for frontend
-├── requirements.txt             # Unified Python dependencies
-├── render.yaml                  # Render Blueprint for 1-click backend deployment
-├── vercel.json                  # Vercel zero-config frontend deployment
-├── start_all.bat                # 1-Click launcher for both services
-├── start_backend.bat            # Dedicated backend launcher (Port 8000)
-├── start_frontend.bat           # Dedicated frontend launcher (Port 5173)
-└── run_tests.bat                # Automated integration test runner
+├── .gitignore                  # Production git exclusion rules
+├── package.json                # Root workspace launcher delegating to frontend
+├── requirements.txt            # Root Python dependencies
+├── render.yaml                 # Render Blueprint for 1-click backend deployment
+├── vercel.json                 # Vercel zero-config frontend deployment
+├── start_all.bat               # 1-Click launcher for both services
+├── start_backend.bat           # Dedicated backend launcher (Port 8000)
+├── start_frontend.bat          # Dedicated frontend launcher (Port 5173)
+└── run_tests.bat               # Automated integration test runner
 ```
 
 ---
@@ -109,13 +111,13 @@ python -m venv .venv
 pip install -r requirements.txt
 
 # Start Unified Server
-python "Kisaan-Saathi-main/app.py"
+python backend/app.py
 ```
 *API Swagger Documentation is available at: `http://localhost:8000/docs`*
 
 #### Step B: Frontend
 ```powershell
-cd "sahaya ai"
+cd frontend
 npm install
 npm run dev
 ```
@@ -142,7 +144,7 @@ python tests/test_emergency_suite.py
 1. **Backend (Render):**
    - Connect repository `https://github.com/sekharguna940-afk/gen-ai-proj`.
    - Build Command: `pip install -r requirements.txt`
-   - Start Command: `python "sahaya ai/backend/server.py"`
+   - Start Command: `python backend/app.py`
    - Copy your public HTTPS URL (e.g. `https://sahaya-backend.onrender.com`).
 
 2. **Frontend (Vercel):**
@@ -165,3 +167,4 @@ python tests/test_emergency_suite.py
 
 ## 📄 License
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+

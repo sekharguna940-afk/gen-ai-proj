@@ -8,7 +8,7 @@
  *  - Standardized error handling
  */
 
-export const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api').replace(/\/$/, '');
+export const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
 
 /**
  * Make an HTTP request to the backend API.

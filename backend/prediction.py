@@ -85,13 +85,12 @@ def load_resources():
             except Exception as e:
                 logger.warning(f"Could not parse {cip}: {e}")
 
-    # Check for fast_model.joblib from sahaya ai or current dir
+    # Check for fast_model.joblib from model directory or current dir
     possible_joblib_paths = [
-        os.path.join(BASE_PRED_DIR, "..", "..", "sahaya ai", "model", "crop_health", "fast_model.joblib"),
+        os.path.join(BASE_PRED_DIR, "model", "crop_health", "fast_model.joblib"),
         os.path.join(BASE_PRED_DIR, "fast_model.joblib"),
-        os.path.join(working_dir, "..", "..", "sahaya ai", "model", "crop_health", "fast_model.joblib"),
-        os.path.join(working_dir, "fast_model.joblib"),
-        "sahaya ai/model/crop_health/fast_model.joblib"
+        os.path.join(working_dir, "model", "crop_health", "fast_model.joblib"),
+        os.path.join(working_dir, "fast_model.joblib")
     ]
     for p in possible_joblib_paths:
         if os.path.exists(p):

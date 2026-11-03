@@ -72,7 +72,7 @@ export const mockComplaints = [
         longitude: 73.9015,
         address: 'Aga Khan Palace Road, Nagar Road, Pune 411006',
         department: 'ELEC',
-        assignedTo: 'Suresh Patil',
+        assignedTo: 'Municipal Field Officer',
         upvotes: 8,
         createdAt: '2026-02-26T10:45:00Z',
         resolvedAt: null,
@@ -227,7 +227,7 @@ export const mockComplaints = [
         longitude: 73.8932,
         address: 'Lane 5, Koregaon Park, Pune 411001',
         department: 'SANIT',
-        assignedTo: 'Priya Sharma',
+        assignedTo: 'Sanitation Field Supervisor',
         upvotes: 19,
         createdAt: '2026-02-22T11:00:00Z',
         resolvedAt: '2026-02-23T09:00:00Z',
@@ -236,8 +236,8 @@ export const mockComplaints = [
         statusHistory: [
             { status: 'submitted', timestamp: '2026-02-22T11:00:00Z', by: 'Citizen' },
             { status: 'assigned', timestamp: '2026-02-22T12:00:00Z', by: 'System' },
-            { status: 'in_progress', timestamp: '2026-02-23T07:00:00Z', by: 'Priya Sharma' },
-            { status: 'resolved', timestamp: '2026-02-23T09:00:00Z', by: 'Priya Sharma' },
+            { status: 'in_progress', timestamp: '2026-02-23T07:00:00Z', by: 'Sanitation Field Supervisor' },
+            { status: 'resolved', timestamp: '2026-02-23T09:00:00Z', by: 'Sanitation Field Supervisor' },
         ],
     },
 ];

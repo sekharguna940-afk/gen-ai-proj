@@ -5,9 +5,10 @@ services:
     region: singapore
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: python "sahaya ai/backend/server.py"
+    startCommand: python backend/app.py
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: MOCK_WEATHER_ALERTS
         value: "false"
+
