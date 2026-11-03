@@ -42,9 +42,16 @@ app.add_middleware(
 import sys
 from pathlib import Path
 
-backend_dir = Path(__file__).resolve().parent.parent.parent / "sahaya ai" / "backend"
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+_this_file = Path(__file__).resolve()
+for candidate in [
+    _this_file.parent.parent / "sahaya ai" / "backend",
+    _this_file.parent.parent.parent / "sahaya ai" / "backend",
+    _this_file.parent / "sahaya ai" / "backend"
+]:
+    if candidate.exists():
+        if str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+        break
 
 try:
     from emergency.seed import init_db_and_seed

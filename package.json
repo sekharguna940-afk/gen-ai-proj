@@ -1,0 +1,23 @@
+{
+  "name": "sahaya-ai-platform",
+  "version": "2.0.0",
+  "description": "SAHAYA AI — Intelligent Community Assistance & Emergency Response Platform",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev --prefix \"sahaya ai\"",
+    "build": "npm run build --prefix \"sahaya ai\"",
+    "preview": "npm run preview --prefix \"sahaya ai\""
+  },
+  "keywords": [
+    "emergency-response",
+    "civic-ai",
+    "kisaan-saathi",
+    "crop-health",
+    "fastapi",
+    "react-19",
+    "vite"
+  ],
+  "author": "SAHAYA AI Team",
+  "license": "MIT"
+}

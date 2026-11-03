@@ -6,7 +6,9 @@ import uvicorn
 # Ensure root paths are in sys.path
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent.parent
-KISAAN_DIR = PROJECT_ROOT / "Kisaan-Saathi-main" / "Kisaan-Saathi-main"
+KISAAN_DIR = PROJECT_ROOT / "Kisaan-Saathi-main"
+if not (KISAAN_DIR / "app.py").exists() and (KISAAN_DIR / "Kisaan-Saathi-main" / "app.py").exists():
+    KISAAN_DIR = KISAAN_DIR / "Kisaan-Saathi-main"
 
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
