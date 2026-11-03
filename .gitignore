@@ -1,0 +1,32 @@
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Dependencies
+node_modules/
+sahaya ai/node_modules/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# Build artifacts
+sahaya ai/dist/
+dist/
+
+# Test artifacts
+test_emergency.db
+*.log
+
+# Submodule git backup
+.git_sahaya_ai_backup/
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.gemini/

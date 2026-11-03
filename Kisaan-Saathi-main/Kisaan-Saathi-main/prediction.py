@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 working_dir = os.getcwd()
+BASE_PRED_DIR = os.path.dirname(os.path.abspath(__file__))
 
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
@@ -70,17 +71,24 @@ def load_resources():
     class_indices = DEFAULT_CLASSES.copy()
 
     # Try loading class_indices.json if present
-    class_indices_path = os.path.join(working_dir, "Disease prediction Model", "class_indices.json")
-    if os.path.exists(class_indices_path):
-        try:
-            with open(class_indices_path, "r", encoding="utf-8") as f:
-                class_indices = json.load(f)
-                logger.info("Loaded class indices from class_indices.json")
-        except Exception as e:
-            logger.warning(f"Could not parse class_indices.json: {e}")
+    class_indices_paths = [
+        os.path.join(BASE_PRED_DIR, "Disease prediction Model", "class_indices.json"),
+        os.path.join(working_dir, "Disease prediction Model", "class_indices.json"),
+    ]
+    for cip in class_indices_paths:
+        if os.path.exists(cip):
+            try:
+                with open(cip, "r", encoding="utf-8") as f:
+                    class_indices = json.load(f)
+                    logger.info(f"Loaded class indices from {cip}")
+                    break
+            except Exception as e:
+                logger.warning(f"Could not parse {cip}: {e}")
 
     # Check for fast_model.joblib from sahaya ai or current dir
     possible_joblib_paths = [
+        os.path.join(BASE_PRED_DIR, "..", "..", "sahaya ai", "model", "crop_health", "fast_model.joblib"),
+        os.path.join(BASE_PRED_DIR, "fast_model.joblib"),
         os.path.join(working_dir, "..", "..", "sahaya ai", "model", "crop_health", "fast_model.joblib"),
         os.path.join(working_dir, "fast_model.joblib"),
         "sahaya ai/model/crop_health/fast_model.joblib"
@@ -95,15 +103,19 @@ def load_resources():
                 logger.warning(f"Failed loading joblib model from {p}: {e}")
 
     # Try loading keras model if available
-    model_path = os.path.join(working_dir, "Disease prediction Model", "trained_model", "plant_disease_prediction.keras")
-    if os.path.exists(model_path):
-        try:
-            import tensorflow as tf
-            prediction_model = tf.keras.models.load_model(model_path, compile=False)
-            logger.info("Loaded plant_disease_prediction.keras successfully")
-            return prediction_model, class_indices
-        except Exception as e:
-            logger.warning(f"Could not load keras model: {e}")
+    keras_paths = [
+        os.path.join(BASE_PRED_DIR, "Disease prediction Model", "trained_model", "plant_disease_prediction.keras"),
+        os.path.join(working_dir, "Disease prediction Model", "trained_model", "plant_disease_prediction.keras")
+    ]
+    for model_path in keras_paths:
+        if os.path.exists(model_path):
+            try:
+                import tensorflow as tf
+                prediction_model = tf.keras.models.load_model(model_path, compile=False)
+                logger.info("Loaded plant_disease_prediction.keras successfully")
+                return prediction_model, class_indices
+            except Exception as e:
+                logger.warning(f"Could not load keras model from {model_path}: {e}")
 
     logger.info("Using resilient crop disease classifier pipeline.")
     return prediction_model, class_indices

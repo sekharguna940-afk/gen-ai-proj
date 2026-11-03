@@ -38,16 +38,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files and templates
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+# Mount Sahaya AI Emergency & Civic Modules
+import sys
+from pathlib import Path
 
-templates = Jinja2Templates(directory="templates") if os.path.exists("templates") else None
+backend_dir = Path(__file__).resolve().parent.parent.parent / "sahaya ai" / "backend"
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
+try:
+    from emergency.seed import init_db_and_seed
+    from emergency.router import router as emergency_router
+    from civic_router import router as civic_router
+
+    init_db_and_seed()
+    app.include_router(emergency_router)
+    app.include_router(civic_router)
+    logger.info("Sahaya AI Emergency & Civic modules mounted successfully.")
+except Exception as e:
+    logger.error(f"Error mounting Sahaya AI modules: {e}", exc_info=True)
+
+# Static files and templates
+BASE_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+static_dir = os.path.join(BASE_APP_DIR, "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+templates_dir = os.path.join(BASE_APP_DIR, "templates")
+templates = Jinja2Templates(directory=templates_dir) if os.path.exists(templates_dir) else None
 
 # Load the water footprint model
 water_footprint_model = None
 water_model_paths = [
+    os.path.join(BASE_APP_DIR, 'Water Footprint Model', 'Model', 'water_footprint_model.pkl'),
+    os.path.join(BASE_APP_DIR, '..', '..', 'sahaya ai', 'model', 'crop_health', 'water_footprint_model.pkl'),
     'Water Footprint Model/Model/water_footprint_model.pkl',
+    '../../sahaya ai/model/crop_health/water_footprint_model.pkl',
+    'sahaya ai/model/crop_health/water_footprint_model.pkl',
+    'water_footprint_model.pkl'
+]
     '../../sahaya ai/model/crop_health/water_footprint_model.pkl',
     'sahaya ai/model/crop_health/water_footprint_model.pkl',
     'water_footprint_model.pkl'
@@ -554,4 +583,4 @@ async def get_notifications():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

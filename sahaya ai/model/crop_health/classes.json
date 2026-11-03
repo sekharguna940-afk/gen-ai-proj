@@ -1,0 +1,19 @@
+[
+  "Maize/01_aphid",
+  "Maize/01_maydis_leaf_blight",
+  "Maize/02_fall_armyworm",
+  "Maize/02_turcicum_leaf_blight",
+  "Maize/03_FAW_symptoms",
+  "Maize/03_curvularia_leaf_spot",
+  "Maize/04_sorghum_downy_mildew",
+  "Maize/Healthy",
+  "Rice/01_Bacterial_leaf_blight",
+  "Rice/02_Brown_spot",
+  "Rice/03_False_smut",
+  "Rice/04_leaf_sheath_blight",
+  "Rice/05_Leaf_folder",
+  "Rice/06_Rice_skipper",
+  "Rice/07_White_stem_borer",
+  "Rice/08_Yellow_stem_borer",
+  "Rice/Healthy"
+]

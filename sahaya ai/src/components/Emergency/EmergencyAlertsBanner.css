@@ -1,0 +1,130 @@
+.emergency-alerts-banner {
+    width: 100%;
+    padding: 10px 16px;
+    font-size: 0.875rem;
+    position: relative;
+    z-index: 40;
+    transition: all 0.2s ease;
+}
+
+.emergency-alerts-banner.has-critical-warning {
+    background-color: #7f1d1d;
+    color: #fef2f2;
+    border-bottom: 2px solid #b91c1c;
+}
+
+.emergency-alerts-banner.info-bar {
+    background: linear-gradient(90deg, #0e3b68 0%, #1a365d 100%);
+    color: #f0fdf4;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.alerts-banner-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    max-width: 1160px;
+    margin: 0 auto;
+}
+
+.alerts-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.alert-pulse-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f87171;
+    animation: alert-pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes alert-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.8; }
+}
+
+.alert-info-icon {
+    color: #93c5fd;
+    display: flex;
+    align-items: center;
+}
+
+.alert-text-block {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.4;
+}
+
+.alert-text-block strong {
+    font-weight: 700;
+}
+
+.alert-source {
+    display: inline-block;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    color: #e2e8f0;
+}
+
+.alerts-banner-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.helpline-quick-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background-color: #f97316;
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.helpline-quick-btn:hover {
+    background-color: #ea580c;
+}
+
+.banner-close-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.banner-close-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 768px) {
+    .alerts-banner-inner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .alerts-banner-right {
+        align-self: flex-end;
+    }
+}
+
