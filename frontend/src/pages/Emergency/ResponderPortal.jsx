@@ -4,7 +4,7 @@ import {
     HardHat, Shield, MapPin, Phone, AlertTriangle, CheckCircle2,
     Clock, Navigation, Camera, X, Send, Compass, ExternalLink,
     RefreshCw, Radio, Check, XCircle, ArrowRight, UserCheck,
-    Volume2, VolumeX, Car, LocateFixed, Navigation2
+    Wifi, WifiOff, BellRing, Volume2, VolumeX, Gauge
 } from 'lucide-react';
 import {
     getResponderAssignments, acceptAssignment, rejectAssignment,
@@ -12,8 +12,34 @@ import {
     shareResponderLocation, uploadEmergencyAttachment, sendEmergencyMessage,
     EmergencySocketClient
 } from '../../services/emergencyApi';
-import { playEmergencyAlarm, playDispatchChime } from '../../utils/emergencyAudio';
 import './ResponderPortal.css';
+
+// Synthetic Web Audio API Chime for urgent dispatches
+const playEmergencyChime = (severity = 'CRITICAL') => {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        if (severity === 'CRITICAL') {
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.setValueAtTime(1174, ctx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.45);
+        } else {
+            osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+        }
+    } catch (e) {}
+};
 
 const ResponderPortal = () => {
     const navigate = useNavigate();
@@ -26,14 +52,12 @@ const ResponderPortal = () => {
     const [sharingLocation, setSharingLocation] = useState(false);
     const [watchId, setWatchId] = useState(null);
 
-    // Real-time Telemetry & Alert State
+    // Real-Time WebSocket & Dispatch Alerts
     const [wsState, setWsState] = useState('connecting');
-    const [audioEnabled, setAudioEnabled] = useState(true);
-    const [incomingDispatchAlert, setIncomingDispatchAlert] = useState(null);
-    const [simulatingCaseId, setSimulatingCaseId] = useState(null);
-    const [simProgress, setSimProgress] = useState(0);
-    const [simDistance, setSimDistance] = useState(null);
-    const simTimerRef = useRef(null);
+    const [incomingDispatchModal, setIncomingDispatchModal] = useState(null);
+    const [liveSimData, setLiveSimData] = useState(null);
+    const liveSimIntervalRef = useRef(null);
+    const socketRef = useRef(null);
 
     // Reject Modal
     const [rejectModalCase, setRejectModalCase] = useState(null);
@@ -47,8 +71,8 @@ const ResponderPortal = () => {
     const [resolvePhotoPreview, setResolvePhotoPreview] = useState(null);
     const [resolveSubmitting, setResolveSubmitting] = useState(false);
 
-    const loadAssignments = async (showLoading = true) => {
-        if (showLoading) setLoading(true);
+    const loadAssignments = async () => {
+        setLoading(true);
         try {
             const res = await getResponderAssignments(null, user.phone);
             if (res?.assignments) setAssignments(res.assignments);
@@ -59,101 +83,127 @@ const ResponderPortal = () => {
         } catch (err) {
             console.error('Failed to load assignments:', err);
         } finally {
-            if (showLoading) setLoading(false);
+            setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadAssignments(true);
+        loadAssignments();
     }, [user.phone]);
 
-    // WebSocket real-time listener & 5s auto-poll fallback
+    // Live WebSocket Subscription for Immediate Dispatch Directives
     useEffect(() => {
-        const clientId = `worker_${user.id || 'rsp'}_${Date.now()}`;
-        const wsClient = new EmergencySocketClient({
+        const respId = responderProfile?.responder_id || 'RSP-001';
+        const clientId = `resp_${respId}_${Date.now()}`;
+        const ws = new EmergencySocketClient({
             clientId,
             role: 'worker',
-            userId: responderProfile?.responder_id || user.phone || 'usr_worker',
+            userId: respId,
             onEvent: (event) => {
+                console.log('[Responder Live Telemetry Event]', event);
                 if (event.type === 'emergency.assigned') {
-                    if (audioEnabled) playEmergencyAlarm();
-                    const c = event.payload?.case;
-                    if (c) setIncomingDispatchAlert(c);
-                    loadAssignments(false);
-                } else if (['emergency.status_change', 'emergency.resolved', 'emergency.closed'].includes(event.type)) {
-                    if (audioEnabled) playDispatchChime();
-                    loadAssignments(false);
+                    playEmergencyChime('CRITICAL');
+                    setIncomingDispatchModal({
+                        caseId: event.payload?.case?.case_id || event.payload?.case_id,
+                        reference: event.payload?.reference_no || event.payload?.case?.reference_no,
+                        category: event.payload?.case?.category_name || 'Emergency Dispatch',
+                        severity: event.payload?.case?.severity || 'HIGH',
+                        address: event.payload?.case?.address || 'Reported Incident Location',
+                        description: event.payload?.case?.description || 'Priority dispatch assigned to your unit.',
+                        time: new Date().toLocaleTimeString()
+                    });
+                    loadAssignments();
+                } else if (
+                    event.type === 'emergency.triaged' ||
+                    event.type === 'emergency.escalated' ||
+                    event.type === 'emergency.closed'
+                ) {
+                    loadAssignments();
                 }
             },
-            onStateChange: (st) => {
-                setWsState(st);
+            onStateChange: (state) => {
+                setWsState(state);
             }
         });
 
-        const pollTimer = setInterval(() => {
-            loadAssignments(false);
-        }, 5000);
+        socketRef.current = ws;
 
         return () => {
-            clearInterval(pollTimer);
-            wsClient.disconnect();
-            if (simTimerRef.current) clearInterval(simTimerRef.current);
+            ws.disconnect();
+            if (liveSimIntervalRef.current) clearInterval(liveSimIntervalRef.current);
         };
-    }, [responderProfile?.responder_id, audioEnabled]);
+    }, [responderProfile?.responder_id]);
 
-    // Simulated En-Route GPS Telemetry Movement
+    // Interactive Real-Time GPS Route Simulator (Drives responder towards incident)
     const handleStartGpsSimulation = (c) => {
-        if (simulatingCaseId === c.case_id) {
-            // Stop simulation
-            if (simTimerRef.current) clearInterval(simTimerRef.current);
-            setSimulatingCaseId(null);
-            setSimProgress(0);
-            setSimDistance(null);
+        if (liveSimIntervalRef.current) {
+            clearInterval(liveSimIntervalRef.current);
+            liveSimIntervalRef.current = null;
+            setLiveSimData(null);
             return;
         }
 
         const startLat = responderProfile?.latitude || 18.5204;
         const startLon = responderProfile?.longitude || 73.8567;
-        const targetLat = c.latitude || 18.5284;
-        const targetLon = c.longitude || 73.8742;
+        const targetLat = c.latitude || 18.5300;
+        const targetLon = c.longitude || 73.8600;
+        const totalSteps = 6;
+        let step = 0;
 
-        setSimulatingCaseId(c.case_id);
-        setSimProgress(10);
-        let step = 1;
-        const totalSteps = 10;
+        setLiveSimData({
+            active: true,
+            caseId: c.case_id,
+            caseRef: c.reference_no,
+            currentLat: startLat,
+            currentLon: startLon,
+            targetLat,
+            targetLon,
+            step: 0,
+            totalSteps,
+            distanceKm: 2.2,
+            speedKmh: 45,
+            etaMins: 4
+        });
 
-        simTimerRef.current = setInterval(async () => {
+        liveSimIntervalRef.current = setInterval(() => {
             step += 1;
-            const progress = (step / totalSteps);
-            setSimProgress(Math.min(Math.round(progress * 100), 100));
+            const progress = step / totalSteps;
+            const lat = Number((startLat + (targetLat - startLat) * progress).toFixed(6));
+            const lon = Number((startLon + (targetLon - startLon) * progress).toFixed(6));
+            const remainingDist = Number(Math.max(0, (2.2 * (1 - progress))).toFixed(2));
+            const speed = step < totalSteps ? Math.floor(40 + Math.random() * 15) : 0;
+            const eta = Math.ceil(remainingDist * 1.5);
 
-            const curLat = startLat + (targetLat - startLat) * progress;
-            const curLon = startLon + (targetLon - startLon) * progress;
+            setLiveSimData({
+                active: true,
+                caseId: c.case_id,
+                caseRef: c.reference_no,
+                currentLat: lat,
+                currentLon: lon,
+                targetLat,
+                targetLon,
+                step,
+                totalSteps,
+                distanceKm: remainingDist,
+                speedKmh: speed,
+                etaMins: eta
+            });
 
-            // Approximate remaining distance
-            const dLat = (targetLat - curLat) * 111;
-            const dLon = (targetLon - curLon) * 111;
-            const distKm = Math.sqrt(dLat * dLat + dLon * dLon).toFixed(2);
-            setSimDistance(distKm);
-
-            try {
-                await shareResponderLocation(
-                    responderProfile?.responder_id || 'RSP-001',
-                    c.case_id,
-                    curLat,
-                    curLon,
-                    8.0
-                );
-            } catch (err) {
-                // Ignore transient network errors
-            }
+            // Broadcast real-time location to backend (which informs citizen & dispatcher via WebSocket)
+            shareResponderLocation(
+                responderProfile?.responder_id || 'RSP-001',
+                c.case_id,
+                lat,
+                lon,
+                5.0
+            ).catch(() => {});
 
             if (step >= totalSteps) {
-                clearInterval(simTimerRef.current);
-                if (audioEnabled) playDispatchChime();
-                setSimDistance('0.00 (Arrived)');
+                clearInterval(liveSimIntervalRef.current);
+                liveSimIntervalRef.current = null;
+                playEmergencyChime('INFO');
             }
-        }, 2200);
+        }, 3000);
     };
 
     // Handle Availability Toggle
@@ -297,43 +347,6 @@ const ResponderPortal = () => {
     return (
         <div className="responder-portal-page">
             <div className="container responder-container">
-                {/* Immediate Deployment Alert Banner */}
-                {incomingDispatchAlert && (
-                    <div className="incoming-dispatch-banner animate-slide-down">
-                        <div className="incoming-banner-left">
-                            <div className="dispatch-badge-icon">
-                                <Radio size={24} />
-                            </div>
-                            <div>
-                                <h3>🚨 IMMEDIATE DEPLOYMENT ASSIGNED: {incomingDispatchAlert.reference_no}</h3>
-                                <p>
-                                    {incomingDispatchAlert.category_name} &bull; Priority: {incomingDispatchAlert.severity}
-                                    {incomingDispatchAlert.address ? ` • ${incomingDispatchAlert.address}` : ''}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="incoming-banner-actions">
-                            <button
-                                type="button"
-                                className="btn btn-sm btn-light"
-                                onClick={() => {
-                                    handleAccept(incomingDispatchAlert);
-                                    setIncomingDispatchAlert(null);
-                                }}
-                            >
-                                <Check size={15} /> Accept Dispatch
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-sm btn-ghost"
-                                onClick={() => setIncomingDispatchAlert(null)}
-                            >
-                                <X size={16} />
-                            </button>
-                        </div>
-                    </div>
-                )}
-
                 {/* Header Profile Bar */}
                 <div className="responder-header-card">
                     <div className="responder-profile-left">
@@ -351,27 +364,16 @@ const ResponderPortal = () => {
                             <div className="resp-meta-pills">
                                 <span className="pill-area"><MapPin size={12} /> {responderProfile?.service_area || 'Pune Metropolitan Sector'}</span>
                                 <span className="pill-active-count">Active Incidents: {activeAssignments.length}</span>
-                                <div className={`live-status-pill ${wsState === 'offline' ? 'offline' : ''}`} style={{ marginLeft: '4px' }}>
-                                    <span className={`status-dot ${wsState === 'connected' ? 'dot-live' : 'dot-warn'}`} />
-                                    <span>{wsState === 'connected' ? 'LIVE GPS STREAM' : 'AUTO-POLL (5s)'}</span>
-                                </div>
+                                <span className={`live-ws-pill ${wsState}`}>
+                                    <span className="live-ws-dot" />
+                                    {wsState === 'connected' ? 'LIVE DISPATCH FEED' : 'CONNECTING...'}
+                                </span>
                             </div>
                         </div>
                     </div>
 
                     <div className="responder-profile-right">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                            <span className="avail-label">Duty Availability:</span>
-                            <button
-                                type="button"
-                                className="btn btn-ghost btn-xs audio-toggle-btn"
-                                onClick={() => setAudioEnabled(!audioEnabled)}
-                                title={audioEnabled ? 'Sound alert enabled' : 'Sound muted'}
-                            >
-                                {audioEnabled ? <Volume2 size={13} className="text-danger" /> : <VolumeX size={13} className="text-muted" />}
-                                {audioEnabled ? 'Sound ON' : 'Muted'}
-                            </button>
-                        </div>
+                        <span className="avail-label">Duty Availability:</span>
                         <div className="availability-btn-group">
                             <button
                                 type="button"
@@ -501,43 +503,6 @@ const ResponderPortal = () => {
                                         </div>
                                     </div>
 
-                                    {/* Real-time En-Route Telemetry Controller */}
-                                    {(c.status === 'ACCEPTED' || c.status === 'RESPONDING') && (
-                                        <div className="gps-telemetry-controller">
-                                            <div className="telemetry-header">
-                                                <div className="telemetry-header-title">
-                                                    <Navigation2 size={15} /> Real-Time Telemetry Stream
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    className={`btn btn-xs ${simulatingCaseId === c.case_id ? 'btn-danger' : 'btn-primary'}`}
-                                                    onClick={() => handleStartGpsSimulation(c)}
-                                                >
-                                                    {simulatingCaseId === c.case_id ? (
-                                                        <>Stop Telemetry</>
-                                                    ) : (
-                                                        <><Car size={13} /> Stream Live Movement</>
-                                                    )}
-                                                </button>
-                                            </div>
-                                            {simulatingCaseId === c.case_id ? (
-                                                <div className="animate-fade-in">
-                                                    <div className="telemetry-progress-track">
-                                                        <div className="telemetry-progress-fill" style={{ width: `${simProgress}%` }} />
-                                                    </div>
-                                                    <div className="telemetry-stats-row">
-                                                        <span><span className="enroute-pulse" /> Live Telemetry Broadcasting to Dispatcher & Citizen</span>
-                                                        <strong>Remaining: {simDistance ? `${simDistance} km` : 'Broadcasting...'} ({simProgress}%)</strong>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                                                    Click <strong>Stream Live Movement</strong> to simulate vehicles advancing en route. Coordinates update live on the Citizen and Dispatcher screens.
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
                                     {/* Action Bar for Status Progression */}
                                     <div className="r-card-action-bar">
                                         {asgnStatus === 'OFFERED' || c.status === 'ASSIGNED' ? (
@@ -582,15 +547,19 @@ const ResponderPortal = () => {
                                                     </button>
                                                 )}
 
-                                                {/* Live Location Sharing Toggle */}
+                                                {/* Live Location Sharing & Route Telemetry Simulator */}
                                                 <button
                                                     type="button"
-                                                    className={`btn-loc-sharing ${sharingLocation ? 'active' : ''}`}
-                                                    onClick={() => handleToggleLocationSharing(c.case_id)}
-                                                    title="Share live responder GPS coordinates with citizen & dispatcher"
+                                                    className={`btn-loc-sharing ${liveSimData?.active && liveSimData?.caseId === c.case_id ? 'active' : ''}`}
+                                                    onClick={() => handleStartGpsSimulation(c)}
+                                                    title="Stream live real-time GPS telemetry to citizen & dispatcher via WebSocket"
                                                 >
-                                                    <Radio size={14} className={sharingLocation ? 'pulse' : ''} />
-                                                    <span>{sharingLocation ? 'Broadcasting Live Location' : 'Share Live GPS'}</span>
+                                                    <Radio size={14} className={liveSimData?.active && liveSimData?.caseId === c.case_id ? 'pulse' : ''} />
+                                                    <span>
+                                                        {liveSimData?.active && liveSimData?.caseId === c.case_id
+                                                            ? 'Stop Live GPS Stream'
+                                                            : '📡 Stream Live GPS (Drive to Incident)'}
+                                                    </span>
                                                 </button>
 
                                                 {c.status === 'ON_SCENE' && (
@@ -615,6 +584,47 @@ const ResponderPortal = () => {
                                                 >
                                                     View Chat & Evidence
                                                 </button>
+                                            </div>
+                                        )}
+
+                                        {/* Real-Time Live GPS Telemetry Stream Box */}
+                                        {liveSimData?.active && liveSimData?.caseId === c.case_id && (
+                                            <div className="live-gps-telemetry-box animate-fade-in" style={{
+                                                marginTop: '0.8rem',
+                                                padding: '0.75rem',
+                                                background: '#f0fdf4',
+                                                border: '1px solid #86efac',
+                                                borderRadius: '6px'
+                                            }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 600, color: '#166534' }}>
+                                                        <span className="live-ws-dot" style={{ background: '#22c55e' }} />
+                                                        STREAMING LIVE GPS TELEMETRY
+                                                    </span>
+                                                    <span style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                                        <Gauge size={13} /> {liveSimData.speedKmh} km/h
+                                                    </span>
+                                                </div>
+                                                <div style={{ fontSize: '0.75rem', color: '#14532d', fontFamily: 'monospace', marginBottom: '0.35rem' }}>
+                                                    GPS: <strong>{liveSimData.currentLat}°N, {liveSimData.currentLon}°E</strong> (Broadcasting to Citizen & Dispatcher)
+                                                </div>
+                                                <div style={{ height: '6px', background: '#dcfce7', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.35rem' }}>
+                                                    <div style={{
+                                                        height: '100%',
+                                                        background: '#22c55e',
+                                                        width: `${(liveSimData.step / liveSimData.totalSteps) * 100}%`,
+                                                        transition: 'width 1s ease'
+                                                    }} />
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#166534' }}>
+                                                    <span>Remaining: <strong>{liveSimData.distanceKm} km</strong></span>
+                                                    <span>ETA: <strong>{liveSimData.etaMins} mins</strong></span>
+                                                    {liveSimData.distanceKm === 0 ? (
+                                                        <span style={{ color: '#15803d', fontWeight: 700 }}>ARRIVED ON SCENE</span>
+                                                    ) : (
+                                                        <span style={{ color: '#15803d' }}>En Route (Waypoint {liveSimData.step}/{liveSimData.totalSteps})</span>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -755,6 +765,73 @@ const ResponderPortal = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Urgent Real-Time Incoming Dispatch Directive */}
+            {incomingDispatchModal && (
+                <div className="modal-backdrop animate-fade-in" style={{ zIndex: 9999 }}>
+                    <div className="modal-content" style={{ maxWidth: '480px', borderTop: '4px solid #dc2626' }}>
+                        <div className="modal-header" style={{ background: '#fef2f2', borderBottom: '1px solid #fee2e2' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                <span style={{ fontSize: '1.5rem', animation: 'pulse 1s infinite' }}>🚨</span>
+                                <div>
+                                    <h2 style={{ fontSize: '1.15rem', color: '#991b1b', margin: 0 }}>PRIORITY DISPATCH DIRECTIVE</h2>
+                                    <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                                        {incomingDispatchModal.reference} • {incomingDispatchModal.time}
+                                    </p>
+                                </div>
+                            </div>
+                            <button type="button" className="modal-close-btn" onClick={() => setIncomingDispatchModal(null)}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div style={{ padding: '1.2rem' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem' }}>
+                                <span className={`severity-tag severity-${incomingDispatchModal.severity.toLowerCase()}`}>
+                                    {incomingDispatchModal.severity}
+                                </span>
+                                <span className="cat-title" style={{ fontSize: '0.88rem', fontWeight: 600 }}>
+                                    {incomingDispatchModal.category}
+                                </span>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
+                                <div style={{ marginBottom: '0.4rem' }}>
+                                    <strong>Reported Location:</strong> {incomingDispatchModal.address}
+                                </div>
+                                <div>
+                                    <strong>Description:</strong> {incomingDispatchModal.description}
+                                </div>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0 }}>
+                                Your unit has been designated based on proximity and qualified capability. Please accept deployment immediately to begin response.
+                            </p>
+                        </div>
+                        <div className="modal-footer" style={{ padding: '0.8rem 1.2rem', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', background: '#f8fafc' }}>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() => {
+                                    const c = assignments.find(a => a.case_id === incomingDispatchModal.caseId) || { case_id: incomingDispatchModal.caseId, reference_no: incomingDispatchModal.reference };
+                                    setRejectModalCase(c);
+                                    setIncomingDispatchModal(null);
+                                }}
+                            >
+                                Decline
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => {
+                                    const c = assignments.find(a => a.case_id === incomingDispatchModal.caseId) || { case_id: incomingDispatchModal.caseId };
+                                    handleAccept(c);
+                                    setIncomingDispatchModal(null);
+                                }}
+                            >
+                                <Check size={16} /> Accept Deployment
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

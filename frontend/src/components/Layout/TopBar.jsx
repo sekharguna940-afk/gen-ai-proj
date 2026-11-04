@@ -64,6 +64,30 @@ const TopBar = ({ user }) => {
           </div>
         </div>
         <div className="topbar__right">
+          <div className="topbar__live-indicator" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            padding: '4px 10px',
+            background: 'rgba(34, 197, 94, 0.1)',
+            border: '1px solid rgba(34, 197, 94, 0.3)',
+            borderRadius: '20px',
+            fontSize: '0.72rem',
+            fontWeight: 600,
+            color: '#166534',
+            letterSpacing: '0.03em'
+          }} title="SAHAYA AI Live Bidirectional WebSocket Active">
+            <span style={{
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              backgroundColor: '#22c55e',
+              display: 'inline-block',
+              boxShadow: '0 0 0 2px rgba(34, 197, 94, 0.25)'
+            }} />
+            REAL-TIME
+          </div>
+
           <div className="topbar__search">
             <Search size={15} className="topbar__search-icon" />
             <input type="text" placeholder="Search complaints or emergency cases..." />

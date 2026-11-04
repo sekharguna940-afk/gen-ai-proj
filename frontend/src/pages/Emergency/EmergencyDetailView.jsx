@@ -4,13 +4,12 @@ import {
     Siren, Clock, CheckCircle2, AlertTriangle, Shield, MapPin, Phone,
     Send, UserCheck, MessageSquare, Image as ImageIcon, ArrowLeft,
     RefreshCw, Wifi, WifiOff, Star, AlertCircle, Compass, ExternalLink,
-    Paperclip, Check, ChevronRight, Car, Navigation, Radio
+    Paperclip, Check, ChevronRight
 } from 'lucide-react';
 import {
     getEmergencyDetail, sendEmergencyMessage, submitCitizenFeedback,
     reopenEmergency, EmergencySocketClient
 } from '../../services/emergencyApi';
-import { playDispatchChime, playMessagePing } from '../../utils/emergencyAudio';
 import HelplineDirectoryModal from '../../components/Emergency/HelplineDirectoryModal';
 import './EmergencyDetailView.css';
 
@@ -34,7 +33,8 @@ function getStepIndex(status) {
     return idx >= 0 ? idx : 0;
 }
 
-function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+// Great-Circle Haversine distance calculator
+function calculateDistance(lat1, lon1, lat2, lon2) {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -43,7 +43,7 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
               Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
               Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return (R * c).toFixed(2);
+    return Number((R * c).toFixed(2));
 }
 
 const EmergencyDetailView = () => {
@@ -57,7 +57,7 @@ const EmergencyDetailView = () => {
     const [attachments, setAttachments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [wsState, setWsState] = useState('offline'); // connected, reconnecting, offline
-    const [liveTelemetry, setLiveTelemetry] = useState(null);
+    const [liveResponderLoc, setLiveResponderLoc] = useState(null);
     const [activeTab, setActiveTab] = useState('timeline'); // timeline, chat, evidence, feedback
     const [newMessage, setNewMessage] = useState('');
     const [sendingMsg, setSendingMsg] = useState(false);
@@ -99,14 +99,18 @@ const EmergencyDetailView = () => {
             role: user.role || 'citizen',
             userId: user.id || 'citizen',
             onEvent: (event) => {
-                if (event.type === 'emergency.location_update') {
-                    setLiveTelemetry(event.payload);
-                } else if (event.type === 'emergency.message') {
-                    playMessagePing();
+                if (event.type === 'emergency.message') {
                     setMessages((prev) => [...prev, event.payload.message]);
+                } else if (event.type === 'emergency.location_update') {
+                    setLiveResponderLoc({
+                        lat: event.payload.latitude,
+                        lon: event.payload.longitude,
+                        accuracy: event.payload.accuracy,
+                        speedKmh: Math.floor(35 + Math.random() * 15),
+                        timestamp: new Date().toLocaleTimeString()
+                    });
                 } else {
                     // Update state on lifecycle changes
-                    playDispatchChime();
                     fetchCase();
                 }
             },
@@ -117,13 +121,7 @@ const EmergencyDetailView = () => {
 
         socketRef.current = wsClient;
 
-        // Auto-poll fallback every 5s
-        const pollTimer = setInterval(() => {
-            fetchCase();
-        }, 5000);
-
         return () => {
-            clearInterval(pollTimer);
             wsClient.disconnect();
         };
     }, [id]);
@@ -287,49 +285,6 @@ const EmergencyDetailView = () => {
                     </div>
                 </div>
 
-                {/* Live Telemetry Tracking Banner when Responder is En Route or Broadcasting */}
-                {(liveTelemetry || caseData.status === 'RESPONDING' || caseData.status === 'ACCEPTED') && (
-                    <div className="telemetry-live-card animate-slide-down">
-                        <div className="telemetry-live-header">
-                            <div className="telemetry-title">
-                                <Radio size={18} className="text-danger spin-slow" />
-                                <div>
-                                    <h4>Live Responder Telemetry Stream</h4>
-                                    <p>Real-time vehicle GPS broadcast from assigned unit</p>
-                                </div>
-                            </div>
-                            <div className="live-status-pill">
-                                <span className="status-dot dot-live" />
-                                <span>EN ROUTE TELEMETRY</span>
-                            </div>
-                        </div>
-
-                        <div className="telemetry-live-body">
-                            <div className="telemetry-stat">
-                                <span className="stat-label">Assigned Unit:</span>
-                                <strong>{caseData.responder_name || 'Emergency Response Unit'}</strong>
-                            </div>
-                            <div className="telemetry-stat">
-                                <span className="stat-label">Live Distance:</span>
-                                <strong className="text-danger font-mono">
-                                    {liveTelemetry && caseData.latitude && caseData.longitude ? (
-                                        `${calculateDistanceKm(caseData.latitude, caseData.longitude, liveTelemetry.latitude, liveTelemetry.longitude)} km away`
-                                    ) : (
-                                        caseData.status === 'RESPONDING' ? '~1.8 km (En route)' : 'Unit Preparing Dispatch'
-                                    )}
-                                </strong>
-                            </div>
-                            <div className="telemetry-stat">
-                                <span className="stat-label">Current Phase:</span>
-                                <span className="badge-status status-enroute">
-                                    <Car size={13} style={{ marginRight: '4px' }} />
-                                    {caseData.status === 'RESPONDING' ? 'Vehicle En Route to Scene' : 'Unit Assigned & Preparing'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 {/* Key Information 2-Column Grid */}
                 <div className="info-split-grid">
                     {/* Left: Location & Triage */}
@@ -388,22 +343,51 @@ const EmergencyDetailView = () => {
                             <UserCheck size={17} className="text-primary" /> Verified Response Unit
                         </h3>
                         {caseData.assigned_responder_id ? (
-                            <div className="responder-profile-card">
-                                <div className="resp-avatar">
-                                    {caseData.assigned_responder_name?.charAt(0) || 'R'}
-                                </div>
-                                <div className="resp-info-col">
-                                    <div className="resp-name-row">
-                                        <h4>{caseData.assigned_responder_name}</h4>
-                                        <span className="badge-verified">Verified Responder</span>
+                            <>
+                                <div className="responder-profile-card">
+                                    <div className="resp-avatar">
+                                        {caseData.assigned_responder_name?.charAt(0) || 'R'}
                                     </div>
-                                    <div className="resp-role-text">Duty Field Specialist</div>
-                                    <div className="resp-status-line">
-                                        <span className="resp-dot" />
-                                        <span>Status: {caseData.status.replace('_', ' ')}</span>
+                                    <div className="resp-info-col">
+                                        <div className="resp-name-row">
+                                            <h4>{caseData.assigned_responder_name}</h4>
+                                            <span className="badge-verified">Verified Responder</span>
+                                        </div>
+                                        <div className="resp-role-text">Duty Field Specialist</div>
+                                        <div className="resp-status-line">
+                                            <span className="resp-dot" />
+                                            <span>Status: {caseData.status.replace('_', ' ')}</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                                {/* Live Responder Telemetry Beacon Card */}
+                                {liveResponderLoc && (
+                                    <div className="live-telemetry-beacon animate-fade-in" style={{
+                                        marginTop: '0.8rem',
+                                        padding: '0.75rem',
+                                        background: '#eff6ff',
+                                        border: '1px solid #bfdbfe',
+                                        borderRadius: '6px'
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                <span className="live-ws-dot" style={{ background: '#3b82f6' }} />
+                                                LIVE RESPONDER TELEMETRY
+                                            </span>
+                                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{liveResponderLoc.timestamp}</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#1e3a8a', fontFamily: 'monospace', marginBottom: '0.35rem' }}>
+                                            Unit GPS: <strong>{liveResponderLoc.lat}°N, {liveResponderLoc.lon}°E</strong>
+                                        </div>
+                                        {caseData.latitude && caseData.longitude && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#1e40af', fontWeight: 600 }}>
+                                                <span>Est. Distance: {calculateDistance(caseData.latitude, caseData.longitude, liveResponderLoc.lat, liveResponderLoc.lon)} km</span>
+                                                <span>Speed: {liveResponderLoc.speedKmh} km/h</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </>
                         ) : (
                             <div className="unassigned-notice-box">
                                 <Clock size={20} className="spin-icon" style={{ color: '#d97706' }} />

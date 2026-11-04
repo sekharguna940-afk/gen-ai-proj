@@ -1,14 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     Siren, Clock, CheckCircle2, AlertTriangle, Shield, PhoneCall,
-    Search, Filter, ChevronRight, MapPin, Sparkles, RefreshCw, Eye
+    Search, Filter, ChevronRight, MapPin, Sparkles, RefreshCw, Eye, X, Volume2
 } from 'lucide-react';
-import { getMyEmergencies } from '../../services/emergencyApi';
+import { getMyEmergencies, EmergencySocketClient } from '../../services/emergencyApi';
 import EmergencySOSModal from '../../components/Emergency/EmergencySOSModal';
 import HelplineDirectoryModal from '../../components/Emergency/HelplineDirectoryModal';
 import EmergencyAlertsBanner from '../../components/Emergency/EmergencyAlertsBanner';
 import './CitizenEmergency.css';
+
+const playChime = () => {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+    } catch (e) {}
+};
 
 const CitizenEmergency = () => {
     const navigate = useNavigate();
@@ -20,28 +37,57 @@ const CitizenEmergency = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [sosModalOpen, setSosModalOpen] = useState(false);
     const [helplinesOpen, setHelplinesOpen] = useState(false);
+    const [liveCitizenAlert, setLiveCitizenAlert] = useState(null);
+    const socketRef = useRef(null);
 
-    const loadCases = (showLoading = true) => {
-        if (showLoading) setLoading(true);
+    const loadCases = () => {
+        setLoading(true);
         getMyEmergencies(user.phone, user.id)
             .then((res) => {
                 if (res?.cases) setCases(res.cases);
             })
             .catch(() => {})
-            .finally(() => {
-                if (showLoading) setLoading(false);
-            });
+            .finally(() => setLoading(false));
     };
 
     useEffect(() => {
-        loadCases(true);
+        loadCases();
 
-        // Auto-refresh cases every 5 seconds for real-time lifecycle tracking
-        const pollTimer = setInterval(() => {
-            loadCases(false);
-        }, 5000);
+        const clientId = `cit_${user.id || 'anon'}_${Date.now()}`;
+        const ws = new EmergencySocketClient({
+            clientId,
+            role: 'citizen',
+            userId: user.id || user.phone || 'citizen',
+            onEvent: (event) => {
+                console.log('[Citizen Live Telemetry Event]', event);
+                playChime();
+                if (event.type === 'emergency.assigned') {
+                    setLiveCitizenAlert({
+                        title: 'Responder Unit Assigned',
+                        message: `A verified field responder has been dispatched to Case ${event.payload?.reference_no || ''}!`,
+                        caseId: event.payload?.case?.case_id
+                    });
+                } else if (event.type === 'emergency.accepted') {
+                    setLiveCitizenAlert({
+                        title: 'Deployment Accepted',
+                        message: `Responder is preparing equipment for Case ${event.payload?.reference_no || ''}!`,
+                        caseId: event.payload?.case?.case_id
+                    });
+                } else if (event.type === 'emergency.resolved') {
+                    setLiveCitizenAlert({
+                        title: 'Incident Resolved',
+                        message: `Your emergency case ${event.payload?.reference_no || ''} has been resolved on scene.`,
+                        caseId: event.payload?.case?.case_id
+                    });
+                }
+                loadCases();
+            }
+        });
+        socketRef.current = ws;
 
-        return () => clearInterval(pollTimer);
+        return () => {
+            ws.disconnect();
+        };
     }, [user.phone, user.id]);
 
     const activeCases = cases.filter(
@@ -69,6 +115,50 @@ const CitizenEmergency = () => {
     return (
         <div className="citizen-emergency-page">
             <EmergencyAlertsBanner onOpenHelplines={() => setHelplinesOpen(true)} />
+
+            {/* Live Real-Time Push Notification Banner */}
+            {liveCitizenAlert && (
+                <div className="container" style={{ marginTop: '0.8rem' }}>
+                    <div className="realtime-incoming-banner animate-fade-in" style={{
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        padding: '0.8rem 1.2rem',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <span style={{ fontSize: '1.4rem' }}>🚑</span>
+                            <div>
+                                <strong style={{ color: '#1e40af', fontSize: '0.92rem' }}>{liveCitizenAlert.title}</strong>
+                                <p style={{ margin: 0, fontSize: '0.84rem', color: '#1e3a8a' }}>{liveCitizenAlert.message}</p>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            {liveCitizenAlert.caseId && (
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-primary"
+                                    onClick={() => {
+                                        navigate(`/emergency/${liveCitizenAlert.caseId}`);
+                                        setLiveCitizenAlert(null);
+                                    }}
+                                >
+                                    Track Case <ChevronRight size={13} />
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                                onClick={() => setLiveCitizenAlert(null)}
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="container emergency-container">
                 {/* Header Action Banner */}
