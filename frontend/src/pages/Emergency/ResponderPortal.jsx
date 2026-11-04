@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     HardHat, Shield, MapPin, Phone, AlertTriangle, CheckCircle2,
     Clock, Navigation, Camera, X, Send, Compass, ExternalLink,
-    RefreshCw, Radio, Check, XCircle, ArrowRight, UserCheck
+    RefreshCw, Radio, Check, XCircle, ArrowRight, UserCheck,
+    Volume2, VolumeX, Car, LocateFixed, Navigation2
 } from 'lucide-react';
 import {
     getResponderAssignments, acceptAssignment, rejectAssignment,
     updateEmergencyStatus, resolveEmergency, toggleResponderAvailability,
-    shareResponderLocation, uploadEmergencyAttachment, sendEmergencyMessage
+    shareResponderLocation, uploadEmergencyAttachment, sendEmergencyMessage,
+    EmergencySocketClient
 } from '../../services/emergencyApi';
+import { playEmergencyAlarm, playDispatchChime } from '../../utils/emergencyAudio';
 import './ResponderPortal.css';
 
 const ResponderPortal = () => {
@@ -23,6 +26,15 @@ const ResponderPortal = () => {
     const [sharingLocation, setSharingLocation] = useState(false);
     const [watchId, setWatchId] = useState(null);
 
+    // Real-time Telemetry & Alert State
+    const [wsState, setWsState] = useState('connecting');
+    const [audioEnabled, setAudioEnabled] = useState(true);
+    const [incomingDispatchAlert, setIncomingDispatchAlert] = useState(null);
+    const [simulatingCaseId, setSimulatingCaseId] = useState(null);
+    const [simProgress, setSimProgress] = useState(0);
+    const [simDistance, setSimDistance] = useState(null);
+    const simTimerRef = useRef(null);
+
     // Reject Modal
     const [rejectModalCase, setRejectModalCase] = useState(null);
     const [rejectReason, setRejectReason] = useState('');
@@ -35,8 +47,8 @@ const ResponderPortal = () => {
     const [resolvePhotoPreview, setResolvePhotoPreview] = useState(null);
     const [resolveSubmitting, setResolveSubmitting] = useState(false);
 
-    const loadAssignments = async () => {
-        setLoading(true);
+    const loadAssignments = async (showLoading = true) => {
+        if (showLoading) setLoading(true);
         try {
             const res = await getResponderAssignments(null, user.phone);
             if (res?.assignments) setAssignments(res.assignments);
@@ -47,13 +59,102 @@ const ResponderPortal = () => {
         } catch (err) {
             console.error('Failed to load assignments:', err);
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadAssignments();
+        loadAssignments(true);
     }, [user.phone]);
+
+    // WebSocket real-time listener & 5s auto-poll fallback
+    useEffect(() => {
+        const clientId = `worker_${user.id || 'rsp'}_${Date.now()}`;
+        const wsClient = new EmergencySocketClient({
+            clientId,
+            role: 'worker',
+            userId: responderProfile?.responder_id || user.phone || 'usr_worker',
+            onEvent: (event) => {
+                if (event.type === 'emergency.assigned') {
+                    if (audioEnabled) playEmergencyAlarm();
+                    const c = event.payload?.case;
+                    if (c) setIncomingDispatchAlert(c);
+                    loadAssignments(false);
+                } else if (['emergency.status_change', 'emergency.resolved', 'emergency.closed'].includes(event.type)) {
+                    if (audioEnabled) playDispatchChime();
+                    loadAssignments(false);
+                }
+            },
+            onStateChange: (st) => {
+                setWsState(st);
+            }
+        });
+
+        const pollTimer = setInterval(() => {
+            loadAssignments(false);
+        }, 5000);
+
+        return () => {
+            clearInterval(pollTimer);
+            wsClient.disconnect();
+            if (simTimerRef.current) clearInterval(simTimerRef.current);
+        };
+    }, [responderProfile?.responder_id, audioEnabled]);
+
+    // Simulated En-Route GPS Telemetry Movement
+    const handleStartGpsSimulation = (c) => {
+        if (simulatingCaseId === c.case_id) {
+            // Stop simulation
+            if (simTimerRef.current) clearInterval(simTimerRef.current);
+            setSimulatingCaseId(null);
+            setSimProgress(0);
+            setSimDistance(null);
+            return;
+        }
+
+        const startLat = responderProfile?.latitude || 18.5204;
+        const startLon = responderProfile?.longitude || 73.8567;
+        const targetLat = c.latitude || 18.5284;
+        const targetLon = c.longitude || 73.8742;
+
+        setSimulatingCaseId(c.case_id);
+        setSimProgress(10);
+        let step = 1;
+        const totalSteps = 10;
+
+        simTimerRef.current = setInterval(async () => {
+            step += 1;
+            const progress = (step / totalSteps);
+            setSimProgress(Math.min(Math.round(progress * 100), 100));
+
+            const curLat = startLat + (targetLat - startLat) * progress;
+            const curLon = startLon + (targetLon - startLon) * progress;
+
+            // Approximate remaining distance
+            const dLat = (targetLat - curLat) * 111;
+            const dLon = (targetLon - curLon) * 111;
+            const distKm = Math.sqrt(dLat * dLat + dLon * dLon).toFixed(2);
+            setSimDistance(distKm);
+
+            try {
+                await shareResponderLocation(
+                    responderProfile?.responder_id || 'RSP-001',
+                    c.case_id,
+                    curLat,
+                    curLon,
+                    8.0
+                );
+            } catch (err) {
+                // Ignore transient network errors
+            }
+
+            if (step >= totalSteps) {
+                clearInterval(simTimerRef.current);
+                if (audioEnabled) playDispatchChime();
+                setSimDistance('0.00 (Arrived)');
+            }
+        }, 2200);
+    };
 
     // Handle Availability Toggle
     const handleToggleAvailability = async (newStatus) => {
@@ -196,6 +297,43 @@ const ResponderPortal = () => {
     return (
         <div className="responder-portal-page">
             <div className="container responder-container">
+                {/* Immediate Deployment Alert Banner */}
+                {incomingDispatchAlert && (
+                    <div className="incoming-dispatch-banner animate-slide-down">
+                        <div className="incoming-banner-left">
+                            <div className="dispatch-badge-icon">
+                                <Radio size={24} />
+                            </div>
+                            <div>
+                                <h3>🚨 IMMEDIATE DEPLOYMENT ASSIGNED: {incomingDispatchAlert.reference_no}</h3>
+                                <p>
+                                    {incomingDispatchAlert.category_name} &bull; Priority: {incomingDispatchAlert.severity}
+                                    {incomingDispatchAlert.address ? ` • ${incomingDispatchAlert.address}` : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="incoming-banner-actions">
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-light"
+                                onClick={() => {
+                                    handleAccept(incomingDispatchAlert);
+                                    setIncomingDispatchAlert(null);
+                                }}
+                            >
+                                <Check size={15} /> Accept Dispatch
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-ghost"
+                                onClick={() => setIncomingDispatchAlert(null)}
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Header Profile Bar */}
                 <div className="responder-header-card">
                     <div className="responder-profile-left">
@@ -213,12 +351,27 @@ const ResponderPortal = () => {
                             <div className="resp-meta-pills">
                                 <span className="pill-area"><MapPin size={12} /> {responderProfile?.service_area || 'Pune Metropolitan Sector'}</span>
                                 <span className="pill-active-count">Active Incidents: {activeAssignments.length}</span>
+                                <div className={`live-status-pill ${wsState === 'offline' ? 'offline' : ''}`} style={{ marginLeft: '4px' }}>
+                                    <span className={`status-dot ${wsState === 'connected' ? 'dot-live' : 'dot-warn'}`} />
+                                    <span>{wsState === 'connected' ? 'LIVE GPS STREAM' : 'AUTO-POLL (5s)'}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <div className="responder-profile-right">
-                        <span className="avail-label">Duty Availability:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span className="avail-label">Duty Availability:</span>
+                            <button
+                                type="button"
+                                className="btn btn-ghost btn-xs audio-toggle-btn"
+                                onClick={() => setAudioEnabled(!audioEnabled)}
+                                title={audioEnabled ? 'Sound alert enabled' : 'Sound muted'}
+                            >
+                                {audioEnabled ? <Volume2 size={13} className="text-danger" /> : <VolumeX size={13} className="text-muted" />}
+                                {audioEnabled ? 'Sound ON' : 'Muted'}
+                            </button>
+                        </div>
                         <div className="availability-btn-group">
                             <button
                                 type="button"
@@ -347,6 +500,43 @@ const ResponderPortal = () => {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Real-time En-Route Telemetry Controller */}
+                                    {(c.status === 'ACCEPTED' || c.status === 'RESPONDING') && (
+                                        <div className="gps-telemetry-controller">
+                                            <div className="telemetry-header">
+                                                <div className="telemetry-header-title">
+                                                    <Navigation2 size={15} /> Real-Time Telemetry Stream
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className={`btn btn-xs ${simulatingCaseId === c.case_id ? 'btn-danger' : 'btn-primary'}`}
+                                                    onClick={() => handleStartGpsSimulation(c)}
+                                                >
+                                                    {simulatingCaseId === c.case_id ? (
+                                                        <>Stop Telemetry</>
+                                                    ) : (
+                                                        <><Car size={13} /> Stream Live Movement</>
+                                                    )}
+                                                </button>
+                                            </div>
+                                            {simulatingCaseId === c.case_id ? (
+                                                <div className="animate-fade-in">
+                                                    <div className="telemetry-progress-track">
+                                                        <div className="telemetry-progress-fill" style={{ width: `${simProgress}%` }} />
+                                                    </div>
+                                                    <div className="telemetry-stats-row">
+                                                        <span><span className="enroute-pulse" /> Live Telemetry Broadcasting to Dispatcher & Citizen</span>
+                                                        <strong>Remaining: {simDistance ? `${simDistance} km` : 'Broadcasting...'} ({simProgress}%)</strong>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                                                    Click <strong>Stream Live Movement</strong> to simulate vehicles advancing en route. Coordinates update live on the Citizen and Dispatcher screens.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Action Bar for Status Progression */}
                                     <div className="r-card-action-bar">

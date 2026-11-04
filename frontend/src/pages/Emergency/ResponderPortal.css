@@ -456,3 +456,128 @@
     }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   REAL-TIME RESPONDER TELEMETRY & DISPATCH STYLES
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.incoming-dispatch-banner {
+    background: linear-gradient(135deg, #1e3a8a, #1e40af);
+    color: #ffffff;
+    border: 1px solid #3b82f6;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.4);
+    animation: siren-glow-blue 2s infinite alternate, slideDown 0.3s ease;
+}
+
+@keyframes siren-glow-blue {
+    from { box-shadow: 0 0 10px rgba(59, 130, 246, 0.4); }
+    to { box-shadow: 0 0 25px rgba(59, 130, 246, 0.85); }
+}
+
+.incoming-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.dispatch-badge-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #bfdbfe;
+    animation: pulse-ring 1.5s infinite;
+}
+
+.incoming-banner-left h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.incoming-banner-left p {
+    margin: 2px 0 0;
+    font-size: 0.82rem;
+    color: #dbeafe;
+}
+
+.incoming-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* En-Route Telemetry Box */
+.gps-telemetry-controller {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 14px 0;
+    color: #f8fafc;
+}
+
+.telemetry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.telemetry-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #38bdf8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.telemetry-progress-track {
+    background: #1e293b;
+    border-radius: 6px;
+    height: 10px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.telemetry-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #10b981);
+    transition: width 0.4s ease;
+}
+
+.telemetry-stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+    color: #94a3b8;
+}
+
+.telemetry-stats-row strong {
+    color: #f8fafc;
+}
+
+.enroute-pulse {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    margin-right: 6px;
+    animation: pulse-dot 1.5s infinite;
+}
+
+

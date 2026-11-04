@@ -808,3 +808,85 @@
     }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   LIVE EN-ROUTE TELEMETRY CARD STYLES
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.telemetry-live-card {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-left: 4px solid #3b82f6;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    color: #f8fafc;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.telemetry-live-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #1e293b;
+}
+
+.telemetry-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.telemetry-title h4 {
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.telemetry-title p {
+    margin: 2px 0 0;
+    font-size: 0.76rem;
+    color: #94a3b8;
+}
+
+.telemetry-live-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 14px 16px;
+}
+
+.telemetry-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.telemetry-stat .stat-label {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.telemetry-stat strong {
+    font-size: 0.92rem;
+    color: #f8fafc;
+}
+
+.status-enroute {
+    display: inline-flex;
+    align-items: center;
+    background: #0284c7;
+    color: #ffffff;
+    font-size: 0.76rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+

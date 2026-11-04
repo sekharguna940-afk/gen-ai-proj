@@ -21,18 +21,27 @@ const CitizenEmergency = () => {
     const [sosModalOpen, setSosModalOpen] = useState(false);
     const [helplinesOpen, setHelplinesOpen] = useState(false);
 
-    const loadCases = () => {
-        setLoading(true);
+    const loadCases = (showLoading = true) => {
+        if (showLoading) setLoading(true);
         getMyEmergencies(user.phone, user.id)
             .then((res) => {
                 if (res?.cases) setCases(res.cases);
             })
             .catch(() => {})
-            .finally(() => setLoading(false));
+            .finally(() => {
+                if (showLoading) setLoading(false);
+            });
     };
 
     useEffect(() => {
-        loadCases();
+        loadCases(true);
+
+        // Auto-refresh cases every 5 seconds for real-time lifecycle tracking
+        const pollTimer = setInterval(() => {
+            loadCases(false);
+        }, 5000);
+
+        return () => clearInterval(pollTimer);
     }, [user.phone, user.id]);
 
     const activeCases = cases.filter(

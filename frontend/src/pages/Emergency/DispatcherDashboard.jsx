@@ -1,29 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     ShieldAlert, AlertTriangle, Users, Clock, CheckCircle2, Siren,
     Search, Filter, MapPin, RefreshCw, UserCheck, ArrowRight, X,
     FileText, Layers, AlertCircle, Phone, Compass, ExternalLink,
-    ChevronRight, BarChart3, Settings, ShieldCheck
+    ChevronRight, BarChart3, Settings, ShieldCheck, Volume2, VolumeX,
+    Radio, Crosshair, Navigation, Locate
 } from 'lucide-react';
 import {
     getEmergencyQueue, getEmergencyAnalytics, getEligibleResponders,
     assignResponder, overrideTriage, closeEmergency, listResponders,
-    sendEmergencyMessage, getEmergencyCategories, updateEmergencyCategory
+    sendEmergencyMessage, getEmergencyCategories, updateEmergencyCategory,
+    EmergencySocketClient
 } from '../../services/emergencyApi';
+import { playEmergencyAlarm, playDispatchChime } from '../../utils/emergencyAudio';
 import './DispatcherDashboard.css';
 
 const DispatcherDashboard = () => {
     const navigate = useNavigate();
     const user = JSON.parse(localStorage.getItem('civicai_user') || '{}');
 
-    const [activeTab, setActiveTab] = useState('unassigned'); // unassigned, active, critical, escalated, resolved, responders, analytics, categories
+    const [activeTab, setActiveTab] = useState('unassigned'); // unassigned, active, critical, escalated, resolved, responders, analytics, categories, map
     const [cases, setCases] = useState([]);
     const [analytics, setAnalytics] = useState(null);
     const [responders, setResponders] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Real-Time Telemetry & Alert State
+    const [wsState, setWsState] = useState('connecting');
+    const [audioEnabled, setAudioEnabled] = useState(true);
+    const [realtimeAlert, setRealtimeAlert] = useState(null);
+    const [selectedMapCase, setSelectedMapCase] = useState(null);
+    const socketRef = useRef(null);
 
     // Modals
     const [selectedCaseForAssign, setSelectedCaseForAssign] = useState(null);
@@ -48,8 +58,8 @@ const DispatcherDashboard = () => {
     const [closeRemarks, setCloseRemarks] = useState('');
     const [closingSubmitting, setClosingSubmitting] = useState(false);
 
-    const loadData = async () => {
-        setLoading(true);
+    const loadData = async (showLoading = true) => {
+        if (showLoading) setLoading(true);
         try {
             const [queueRes, analyticsRes, respRes, catRes] = await Promise.all([
                 getEmergencyQueue({ status: activeTab, q: searchQuery }),
@@ -65,13 +75,54 @@ const DispatcherDashboard = () => {
         } catch (err) {
             console.error('Failed to load operations data:', err);
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadData();
+        loadData(true);
     }, [activeTab, searchQuery]);
+
+    // Setup Real-Time WebSocket & Background Auto-Polling
+    useEffect(() => {
+        const clientId = `dispatcher_${user.id || 'admin'}_${Date.now()}`;
+        const wsClient = new EmergencySocketClient({
+            clientId,
+            role: 'dispatcher',
+            userId: user.id || 'admin_01',
+            onEvent: (event) => {
+                if (event.type === 'emergency.created') {
+                    if (audioEnabled) playEmergencyAlarm();
+                    const c = event.payload?.case;
+                    if (c) {
+                        setRealtimeAlert(c);
+                        setCases((prev) => [c, ...prev.filter(x => x.case_id !== c.case_id)]);
+                    }
+                    loadData(false);
+                } else if (
+                    ['emergency.assigned', 'emergency.accepted', 'emergency.escalated', 'emergency.resolved', 'emergency.status_change'].includes(event.type)
+                ) {
+                    if (audioEnabled) playDispatchChime();
+                    loadData(false);
+                }
+            },
+            onStateChange: (st) => {
+                setWsState(st);
+            }
+        });
+
+        socketRef.current = wsClient;
+
+        // Background 5s live polling fallback to guarantee real-time updates always
+        const pollTimer = setInterval(() => {
+            loadData(false);
+        }, 5000);
+
+        return () => {
+            clearInterval(pollTimer);
+            wsClient.disconnect();
+        };
+    }, [audioEnabled]);
 
     // Handle Open Assign Modal
     const openAssignModal = async (c) => {
@@ -197,6 +248,41 @@ const DispatcherDashboard = () => {
     return (
         <div className="dispatcher-dashboard-page">
             <div className="container operations-container">
+                {/* Real-Time Alarm Notification Banner */}
+                {realtimeAlert && (
+                    <div className="realtime-alarm-banner animate-slide-down">
+                        <div className="alarm-banner-content">
+                            <span className="alarm-siren-icon"><Siren size={22} /></span>
+                            <div>
+                                <strong className="alarm-title">🚨 LIVE EMERGENCY REPORTED: {realtimeAlert.reference_no}</strong>
+                                <p className="alarm-sub">
+                                    {realtimeAlert.category_name} &bull; Severity: <span className="badge-severity">{realtimeAlert.severity}</span>
+                                    {realtimeAlert.address ? ` • ${realtimeAlert.address}` : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="alarm-banner-actions">
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-light"
+                                onClick={() => {
+                                    openAssignModal(realtimeAlert);
+                                    setRealtimeAlert(null);
+                                }}
+                            >
+                                <Crosshair size={14} /> Triage & Assign Now
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-ghost"
+                                onClick={() => setRealtimeAlert(null)}
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Operations Header */}
                 <div className="operations-header-bar">
                     <div className="header-title-box">
@@ -208,13 +294,26 @@ const DispatcherDashboard = () => {
                             <p className="text-muted">Real-Time Municipal Triage, Intelligent Dispatch & Escalation</p>
                         </div>
                     </div>
-                    <div className="header-actions">
+                    <div className="header-actions header-actions-group">
+                        <div className={`live-status-pill ${wsState === 'offline' ? 'offline' : ''}`}>
+                            <span className={`status-dot ${wsState === 'connected' ? 'dot-live' : 'dot-warn'}`} />
+                            <span>{wsState === 'connected' ? 'REAL-TIME ACTIVE' : 'LIVE POLLING (5s)'}</span>
+                        </div>
+                        <button
+                            type="button"
+                            className="btn btn-outline btn-sm audio-toggle-btn"
+                            onClick={() => setAudioEnabled(!audioEnabled)}
+                            title={audioEnabled ? 'Sound alert enabled' : 'Sound muted'}
+                        >
+                            {audioEnabled ? <Volume2 size={14} className="text-danger" /> : <VolumeX size={14} className="text-muted" />}
+                            {audioEnabled ? 'Sound ON' : 'Muted'}
+                        </button>
                         <button
                             type="button"
                             className="btn btn-outline btn-sm"
-                            onClick={loadData}
+                            onClick={() => loadData(true)}
                         >
-                            <RefreshCw size={14} className={loading ? 'spin-icon' : ''} /> Refresh Queue
+                            <RefreshCw size={14} className={loading ? 'spin-icon' : ''} /> Refresh
                         </button>
                     </div>
                 </div>
@@ -281,6 +380,13 @@ const DispatcherDashboard = () => {
                         </button>
                         <button
                             type="button"
+                            className={`q-tab-btn ${activeTab === 'map' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('map')}
+                        >
+                            <Radio size={14} className="text-danger" /> Live Tactical Radar
+                        </button>
+                        <button
+                            type="button"
                             className={`q-tab-btn ${activeTab === 'escalated' ? 'active' : ''}`}
                             onClick={() => setActiveTab('escalated')}
                         >
@@ -305,7 +411,7 @@ const DispatcherDashboard = () => {
                             className={`q-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
                             onClick={() => setActiveTab('analytics')}
                         >
-                            <BarChart3 size={14} /> Analytics & Map
+                            <BarChart3 size={14} /> Analytics
                         </button>
                         <button
                             type="button"
@@ -465,6 +571,166 @@ const DispatcherDashboard = () => {
                                     </tbody>
                                 </table>
                             )}
+                        </div>
+                    )}
+
+                    {/* Live Tactical Radar Map Tab */}
+                    {activeTab === 'map' && (
+                        <div className="radar-map-wrapper animate-fade-in">
+                            <div className="radar-header">
+                                <div className="radar-header-title">
+                                    <Radio size={20} className="text-danger spin-slow" />
+                                    <div>
+                                        <h3>Live Geospatial Telemetry Radar</h3>
+                                        <p>Real-time plotted emergency coordinates, casualty clusters & deployed response units</p>
+                                    </div>
+                                </div>
+                                <div className="live-status-pill">
+                                    <span className="status-dot dot-live" />
+                                    <span>LIVE BEACON TRACKING</span>
+                                </div>
+                            </div>
+
+                            <div className="radar-content-grid">
+                                <div className="radar-canvas-container">
+                                    <div className="radar-sweep-line" />
+                                    
+                                    {/* Concentric Radar Grid Rings */}
+                                    <svg className="radar-grid-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                        <circle cx="50" cy="50" r="15" fill="none" stroke="#1e293b" strokeWidth="0.5" strokeDasharray="1,1" />
+                                        <circle cx="50" cy="50" r="30" fill="none" stroke="#334155" strokeWidth="0.5" />
+                                        <circle cx="50" cy="50" r="45" fill="none" stroke="#334155" strokeWidth="0.5" />
+                                        <line x1="50" y1="0" x2="50" y2="100" stroke="#1e293b" strokeWidth="0.4" />
+                                        <line x1="0" y1="50" x2="100" y2="50" stroke="#1e293b" strokeWidth="0.4" />
+                                    </svg>
+
+                                    {/* Plotted Emergency Incident Pins */}
+                                    {cases.filter(c => c.latitude && c.longitude).map((c, i) => {
+                                        // Normalize lat/lon to percentage relative to Pune center ~ (18.5204, 73.8567)
+                                        const deltaLat = (c.latitude - 18.5204) * 500;
+                                        const deltaLon = (c.longitude - 73.8567) * 500;
+                                        const posX = Math.min(Math.max(50 + deltaLon, 8), 92);
+                                        const posY = Math.min(Math.max(50 - deltaLat, 8), 92);
+                                        const sev = (c.severity || 'MEDIUM').toLowerCase();
+
+                                        return (
+                                            <div
+                                                key={c.case_id}
+                                                className="radar-marker"
+                                                style={{ left: `${posX}%`, top: `${posY}%` }}
+                                                onClick={() => setSelectedMapCase(c)}
+                                                title={`${c.reference_no}: ${c.category_name} (${c.severity})`}
+                                            >
+                                                <div className={`radar-beacon ${sev}`}>
+                                                    <Siren size={12} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* Plotted Responders Pins */}
+                                    {responders.filter(r => r.latitude && r.longitude).map((r) => {
+                                        const deltaLat = (r.latitude - 18.5204) * 500;
+                                        const deltaLon = (r.longitude - 73.8567) * 500;
+                                        const posX = Math.min(Math.max(50 + deltaLon, 10), 90);
+                                        const posY = Math.min(Math.max(50 - deltaLat, 10), 90);
+
+                                        return (
+                                            <div
+                                                key={r.responder_id}
+                                                className="radar-marker"
+                                                style={{ left: `${posX}%`, top: `${posY}%` }}
+                                                title={`Verified Unit: ${r.name} (${r.role})`}
+                                            >
+                                                <div className="radar-beacon responder">
+                                                    <Shield size={12} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Tactical Radar Inspector Sidebar */}
+                                <div className="radar-sidebar-panel">
+                                    <div className="radar-side-header">
+                                        <h4>Tactical Incident Inspector</h4>
+                                        <p>Select any glowing beacon to inspect coordinates & dispatch units</p>
+                                    </div>
+
+                                    {selectedMapCase ? (
+                                        <div className="radar-detail-box animate-fade-in">
+                                            <div className="radar-field">
+                                                <span>Case Ref:</span>
+                                                <strong>{selectedMapCase.reference_no}</strong>
+                                            </div>
+                                            <div className="radar-field">
+                                                <span>Category:</span>
+                                                <span>{selectedMapCase.category_name}</span>
+                                            </div>
+                                            <div className="radar-field">
+                                                <span>Severity:</span>
+                                                <span className={`cat-pill cat-${(selectedMapCase.severity || 'medium').toLowerCase()}`}>
+                                                    {selectedMapCase.severity}
+                                                </span>
+                                            </div>
+                                            <div className="radar-field">
+                                                <span>Status:</span>
+                                                <span className="badge-status">{selectedMapCase.status}</span>
+                                            </div>
+                                            <div className="radar-field">
+                                                <span>Casualties:</span>
+                                                <span>{selectedMapCase.affected_people || 'None reported'}</span>
+                                            </div>
+                                            <div className="radar-field">
+                                                <span>Coordinates:</span>
+                                                <span className="font-mono">{selectedMapCase.latitude?.toFixed(4)}°N, {selectedMapCase.longitude?.toFixed(4)}°E</span>
+                                            </div>
+                                            {selectedMapCase.address && (
+                                                <div style={{ marginTop: '8px', fontSize: '0.76rem', color: '#cbd5e1' }}>
+                                                    📍 {selectedMapCase.address}
+                                                </div>
+                                            )}
+                                            <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-primary"
+                                                    style={{ flex: 1 }}
+                                                    onClick={() => openAssignModal(selectedMapCase)}
+                                                >
+                                                    <UserCheck size={14} /> Assign Unit
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline"
+                                                    onClick={() => navigate(`/emergency/case/${selectedMapCase.case_id}`)}
+                                                >
+                                                    View
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ textAlign: 'center', padding: '30px 10px', color: '#64748b', fontSize: '0.8rem' }}>
+                                            <Crosshair size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+                                            <p>No beacon selected.<br />Click on any radar dot to view live telemetry.</p>
+                                        </div>
+                                    )}
+
+                                    <div className="radar-legend-bar">
+                                        <div className="legend-item">
+                                            <span className="legend-color-dot" style={{ background: '#ef4444' }} /> Critical
+                                        </div>
+                                        <div className="legend-item">
+                                            <span className="legend-color-dot" style={{ background: '#f59e0b' }} /> High
+                                        </div>
+                                        <div className="legend-item">
+                                            <span className="legend-color-dot" style={{ background: '#3b82f6' }} /> Medium
+                                        </div>
+                                        <div className="legend-item">
+                                            <span className="legend-color-dot" style={{ background: '#10b981' }} /> Responder Unit
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
